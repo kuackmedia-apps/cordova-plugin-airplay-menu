@@ -1,16 +1,17 @@
-<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
-        id="cordova-plugin-airplay-menu"
-        version="1.0.0">
+<?xml version='1.0' encoding='utf-8'?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" id="cordova-plugin-airplay-menu" version="1.0.0">
     <name>AirPlayMenu</name>
     <js-module src="www/airplayMenu.js" name="AirPlayMenu">
         <clobbers target="AirPlayMenu" />
     </js-module>
+
     <platform name="ios">
         <config-file target="config.xml" parent="/*">
             <feature name="AirPlayMenu">
-                <param name="ios-package" value="AirPlayMenu" />
+                <param name="ios-package" value="AirPlayMenu"/>
             </feature>
         </config-file>
-        <source-file src="src/ios/AirPlayMenu.m" />
+        <source-file src="src/ios/AirPlayMenu.m"/>
+        <header-file src="src/ios/AirPlayMenu.h"/>
     </platform>
 </plugin>
