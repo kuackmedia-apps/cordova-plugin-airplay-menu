@@ -2,7 +2,18 @@
 #import <AVKit/AVKit.h>
 #import <AVFoundation/AVFoundation.h>
 
+@interface AirPlayMenu ()
+@property (nonatomic, strong) NSString* deviceChangeCallbackId;
+@end
+
 @implementation AirPlayMenu
+
+- (void)pluginInitialize {
+    [[NSNotificationCenter defaultCenter] addObserver:self
+        selector:@selector(audioRouteChanged:)
+        name:AVAudioSessionRouteChangeNotification
+        object:nil];
+}
 
 - (void)show:(CDVInvokedUrlCommand*)command {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -24,36 +35,58 @@
 }
 
 - (void)getConnectedDevice:(CDVInvokedUrlCommand*)command {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        AVAudioSessionRouteDescription *currentRoute = [[AVAudioSession sharedInstance] currentRoute];
-        NSString *connectedDevice = @"";
+    [self sendCurrentDeviceInfo:command.callbackId keepCallback:NO];
+}
 
-        if(currentRoute.outputs.count > 0){
-            AVAudioSessionPortDescription *output = currentRoute.outputs.firstObject;
+- (void)startMonitoringDeviceChanges:(CDVInvokedUrlCommand*)command {
+    self.deviceChangeCallbackId = command.callbackId;
+    [self sendCurrentDeviceInfo:self.deviceChangeCallbackId keepCallback:YES];
+}
 
-            // Tipo de salida: Bluetooth, CarPlay, AirPlay, o altavoz
-            NSString *portType = output.portType;
-            NSString *deviceName = output.portName;
+- (void)audioRouteChanged:(NSNotification*)notification {
+    if (self.deviceChangeCallbackId) {
+        [self sendCurrentDeviceInfo:self.deviceChangeCallbackId keepCallback:YES];
+    }
+}
 
-            // Determina si está conectado a AirPlay/Bluetooth/CarPlay
-            if ([portType isEqualToString:AVAudioSessionPortAirPlay] ||
-                [portType isEqualToString:AVAudioSessionPortBluetoothA2DP] ||
-                [portType isEqualToString:AVAudioSessionPortBluetoothLE] ||
-                [portType isEqualToString:AVAudioSessionPortBluetoothHFP] ||
-                [portType isEqualToString:AVAudioSessionPortCarAudio]) {
+- (void)sendCurrentDeviceInfo:(NSString*)callbackId keepCallback:(BOOL)keepCallback {
+    AVAudioSessionRouteDescription *currentRoute = [[AVAudioSession sharedInstance] currentRoute];
+    NSString *connectedDevice = @"";
+    NSString *deviceType = @"none";
 
-                connectedDevice = deviceName;
-            }
+    if(currentRoute.outputs.count > 0){
+        AVAudioSessionPortDescription *output = currentRoute.outputs.firstObject;
+        NSString *portType = output.portType;
+        NSString *deviceName = output.portName;
+
+        if ([portType isEqualToString:AVAudioSessionPortAirPlay]) {
+            deviceType = @"airplay";
+            connectedDevice = deviceName;
+        } else if ([portType isEqualToString:AVAudioSessionPortBluetoothA2DP] ||
+                   [portType isEqualToString:AVAudioSessionPortBluetoothLE] ||
+                   [portType isEqualToString:AVAudioSessionPortBluetoothHFP]) {
+            deviceType = @"bluetooth";
+            connectedDevice = deviceName;
+        } else if ([portType isEqualToString:AVAudioSessionPortCarAudio]) {
+            deviceType = @"carplay";
+            connectedDevice = deviceName;
         }
+    }
 
-        NSDictionary *resultDict = @{
-            @"connected": @(connectedDevice.length > 0),
-            @"deviceName": connectedDevice
-        };
+    NSDictionary *resultDict = @{
+        @"connected": @(connectedDevice.length > 0),
+        @"deviceName": connectedDevice,
+        @"deviceType": deviceType
+    };
 
-        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:resultDict];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    });
+    CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:resultDict];
+    pluginResult.keepCallback = @(keepCallback);
+    [self.commandDelegate sendPluginResult:pluginResult callbackId:callbackId];
+}
+
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 @end
